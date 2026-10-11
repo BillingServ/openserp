@@ -188,29 +188,31 @@ func (gogl *Google) waitAnswersExpanded(ctx context.Context, answers rod.Element
 }
 
 func (gogl *Google) acceptCookies(page *rod.Page) {
-	// Probe with Has first so a banner-less SERP doesn't block on .Search's full
-	// timeout (AGENTS.md: use Has for existence).
-	if has, _, err := page.Has(Selectors.CookieBtn); err != nil || !has {
-		return
-	}
-	diaglogBtns, err := page.Timeout(gogl.Timeout / 10).Search(Selectors.CookieBtn)
+	// Probe without waiting when there is no banner. Google's stable accept
+	// button ID also handles localized dialogs without relying on button order.
+	has, button, err := page.Has(Selectors.CookieAccept)
 	if err != nil {
-		gogl.logger.Debug("Cookie consent not found: %s", err)
 		return
 	}
-	btnElms, err := diaglogBtns.All()
-	if err != nil {
-		gogl.logger.Debug("Cannot get cookie consent buttons: %s", err)
+	if !has {
+		buttons, err := page.Elements(Selectors.CookieBtn)
+		if err != nil {
+			return
+		}
+		for _, candidate := range buttons {
+			text, err := candidate.Text()
+			if err == nil && (strings.EqualFold(strings.TrimSpace(text), "Accept all") || strings.EqualFold(strings.TrimSpace(text), "I agree")) {
+				button = candidate
+				break
+			}
+		}
+	}
+	if button == nil {
 		return
 	}
-	if len(btnElms) < 4 {
-		gogl.logger.Debug("Cookie consent buttons unavailable")
-		return
-	}
-	if err := btnElms[3].Click(proto.InputMouseButtonLeft, 1); err != nil {
+	if err := button.Timeout(gogl.Timeout/10).Click(proto.InputMouseButtonLeft, 1); err != nil {
 		gogl.logger.Debug("Cookie consent click failed: %s", err)
 	}
-
 }
 
 func googleElementHasAdMarker(el *rod.Element) bool {
@@ -254,10 +256,8 @@ func (gogl *Google) Search(ctx context.Context, query core.Query) (results []cor
 		return nil, err
 	}
 
-	// Accept cookie consent so Google renders its SERP feature modules
-	if query.Features {
-		gogl.acceptCookies(page)
-	}
+	// Consent can appear on the first search even when features are disabled.
+	gogl.acceptCookies(page)
 
 	// Wait for the canonical organic wrapper first, then Google's broader
 	// data-hveid/data-ved layout. Headless and headful Chrome can receive
@@ -486,6 +486,12 @@ func (gogl *Google) Search(ctx context.Context, query core.Query) (results []cor
 	if query.Features {
 		deduped = core.AttachFeaturesToFirstResult(deduped, extractGoogleFeaturesFromPage(ctx, page))
 	}
+	resolutionQuery := query
+	if strings.TrimSpace(resolutionQuery.ProxyURL) == "" {
+		resolutionQuery.ProxyURL = gogl.ProxyURL
+	}
+	resolutionQuery.Insecure = resolutionQuery.Insecure || gogl.Insecure
+	core.ResolveGoogleResultURLs(ctx, resolutionQuery, url, deduped)
 	return deduped, nil
 }
 
@@ -511,6 +517,11 @@ func (gogl *Google) SearchImage(ctx context.Context, query core.Query) ([]core.S
 	}
 
 	defer gogl.close(ctx, page)
+
+	if err := gogl.classifyPage(page, query.ProxyURL); err != nil && !errors.Is(err, core.ErrEmptyResult) {
+		return nil, err
+	}
+	gogl.acceptCookies(page)
 
 	// Hard cap on outer scroll/parse passes. Google's image grid is virtualized
 	// and infinite-scroll: WaitLoad after scroll never settles and individual

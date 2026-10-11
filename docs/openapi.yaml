@@ -1409,6 +1409,10 @@ components:
           example: The Go Programming Language
         url:
           type: string
+          description: >
+            Result destination URL. Live Google browser and raw searches resolve
+            Google redirect wrappers on a best-effort basis; unresolved wrappers
+            are preserved. Offline parse endpoints do not fetch redirect URLs.
           example: https://go.dev/
         display_url:
           type: string

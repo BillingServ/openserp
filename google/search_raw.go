@@ -233,9 +233,11 @@ func Search(ctx context.Context, query core.Query) (results []core.SearchResult,
 			}
 		}
 	}
+	parsedResults = core.StripResultFeatures(parsedResults, query.Features)
+	core.ResolveGoogleResultURLs(ctx, query, googleURL, parsedResults)
 	core.WithRequest(ctx).WithField("results_count", len(parsedResults)).Debug(
 		fmt.Sprintf("Google Raw results : %v", parsedResults),
 	)
 
-	return core.StripResultFeatures(parsedResults, query.Features), nil
+	return parsedResults, nil
 }

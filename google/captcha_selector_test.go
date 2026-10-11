@@ -17,6 +17,11 @@ func TestGooglePageTypeSelectors(t *testing.T) {
 		selector string
 		wantHit  bool
 	}{
+		{"search_consent.html", Selectors.Captcha, false},
+		{"search_consent.html", Selectors.CaptchaPage, false},
+		{"search_consent.html", Selectors.CookieBtn, true},
+		{"search_consent.html", Selectors.Results, true},
+
 		{"search_captcha.html", Selectors.Captcha, true},
 		{"search_captcha.html", Selectors.CaptchaPage, true},
 		{"search_captcha.html", Selectors.ResultStats, false},

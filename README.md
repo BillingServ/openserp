@@ -263,6 +263,13 @@ curl "http://127.0.0.1:7000/google/search?text=llm+observability&extract=2&forma
 
 No server required - query an engine straight from the terminal. The CLI shares the same engines, formats, and filters as the API.
 
+Google browser and raw searches automatically resolve wrapped result links such as
+`google.com/goto?url=...` to their destination URLs. Resolution keeps each result's
+rank, uses the configured proxy, and reads Google's redirect headers without loading
+the destination page. It uses at most three concurrent requests within a shared
+five-second budget; links that cannot be resolved retain their original wrapper.
+Offline HTML parsing does not make these requests.
+
 ```sh
 openserp search ecosia "weather in london" --format markdown
 ```

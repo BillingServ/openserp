@@ -27,6 +27,12 @@ func TestGoogleParseHTMLFixtures(t *testing.T) {
 			maxResultCount: 20,
 		},
 		{
+			name:           "search results with cookie consent",
+			fixture:        "search_consent.html",
+			minResultCount: 1,
+			maxResultCount: 1,
+		},
+		{
 			name:     "no results",
 			fixture:  "search_no_results.html",
 			wantZero: true,
@@ -103,6 +109,7 @@ func TestGoogleClassifyRawHTML(t *testing.T) {
 		fixture string
 		want    error
 	}{
+		{name: "results with cookie consent", fixture: "search_consent.html"},
 		{name: "no results", fixture: "search_no_results.html", want: core.ErrEmptyResult},
 		{name: "captcha page", fixture: "search_captcha.html", want: core.ErrCaptcha},
 		{name: "new captcha page", fixture: "search_captcha_new.html", want: core.ErrCaptcha},

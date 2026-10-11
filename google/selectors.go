@@ -11,6 +11,7 @@ var Selectors = struct {
 	NoResults      string
 	ResultStats    string
 	CookieBtn      string
+	CookieAccept   string
 	Results        string
 	ResultsBroad   string
 	Ad             string
@@ -33,18 +34,19 @@ var Selectors = struct {
 	Captcha:     "[data-sitekey]",
 	CaptchaPage: "form#captcha-form, form[action*='/sorry/'], body[onload*='captcha'], [data-sitekey], .g-recaptcha, script[src*='recaptcha']",
 	// CaptchaMarkers is the page-text fallback for captcha variants whose
-	// markup doesn't match CaptchaPage.
+	// markup doesn't match CaptchaPage. "Before you continue" belongs to the
+	// cookie-consent dialog and must not classify a normal SERP as a challenge.
 	CaptchaMarkers: []string{
 		"detected unusual traffic",
 		"unusual traffic from your computer network",
-		"before you continue",
 		"not a robot",
 		"solve the captcha",
 	},
-	SoftBlock:   "noscript",
-	NoResults:   "#botstuff, #topstuff, .mnr-c",
-	ResultStats: "div#result-stats",
-	CookieBtn:   "div[role='dialog'][aria-modal] button",
+	SoftBlock:    "noscript",
+	NoResults:    "#botstuff, #topstuff, .mnr-c",
+	ResultStats:  "div#result-stats",
+	CookieBtn:    "div[role='dialog'][aria-modal] button",
+	CookieAccept: "button#L2AGLb",
 	// Results targets the canonical organic result block. div.tF2Cxc is the
 	// stable per-result wrapper; the :not(:has(div.tF2Cxc)) guard keeps only the
 	// innermost block so nested knowledge-panel cards (which reuse tF2Cxc) don't
