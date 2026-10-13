@@ -236,16 +236,26 @@ func (gogl *Google) Search(ctx context.Context, query core.Query) (results []cor
 	gogl = &scoped
 
 	gogl.logger.Debug("Starting search, query: %+v", query)
+	results, err = collectGoogleSearchPages(ctx, query, gogl.searchPage)
+	if len(results) > 0 && (errors.Is(err, core.ErrCaptcha) || errors.Is(err, core.ErrBlocked) ||
+		errors.Is(err, core.ErrSearchTimeout) || errors.Is(err, core.ErrParser)) {
+		gogl.logger.Warn("Pagination stopped (%s); returning %d collected results", err, len(results))
+		return results, nil
+	}
+	return results, err
+}
+
+func (gogl *Google) searchPage(ctx context.Context, query core.Query) (googleSearchPage, error) {
 	searchResults := []core.SearchResult{}
 
 	// Build URL from query struct to open in browser
 	url, err := BuildURL(query)
 	if err != nil {
-		return nil, err
+		return googleSearchPage{}, err
 	}
 	page, err := gogl.Navigate(ctx, url)
 	if err != nil {
-		return nil, err
+		return googleSearchPage{}, err
 	}
 
 	defer gogl.close(ctx, page)
@@ -253,7 +263,7 @@ func (gogl *Google) Search(ctx context.Context, query core.Query) (results []cor
 
 	if err := gogl.classifyPage(page, query.ProxyURL); err != nil && !errors.Is(err, core.ErrEmptyResult) {
 		gogl.logger.Error("Page classified as %v: %s", err, url)
-		return nil, err
+		return googleSearchPage{}, err
 	}
 
 	// Consent can appear on the first search even when features are disabled.
@@ -266,15 +276,15 @@ func (gogl *Google) Search(ctx context.Context, query core.Query) (results []cor
 	if err != nil {
 		if pageErr := gogl.classifyPage(page, query.ProxyURL); pageErr != nil {
 			if errors.Is(pageErr, core.ErrEmptyResult) {
-				return nil, nil
+				return googleSearchPage{}, nil
 			}
 			gogl.logger.Error("Page classified as %v: %s", pageErr, url)
-			return nil, pageErr
+			return googleSearchPage{}, pageErr
 		}
 		if core.IsContextDone(err) {
-			return nil, err
+			return googleSearchPage{}, err
 		}
-		return nil, core.ErrSearchTimeout
+		return googleSearchPage{}, core.ErrSearchTimeout
 	}
 	gogl.logger.Debug("Search result selector matched: %s (%d elements)", matchedSelector, len(searchResultElems))
 
@@ -369,7 +379,7 @@ func (gogl *Google) Search(ctx context.Context, query core.Query) (results []cor
 			}
 			// Poll for expansion (usually 200-400ms) instead of a flat 2s sleep.
 			if err := gogl.waitAnswersExpanded(ctx, answers, 2*time.Second); err != nil {
-				return nil, err
+				return googleSearchPage{}, err
 			}
 
 			for i, answ := range answers {
@@ -471,17 +481,17 @@ func (gogl *Google) Search(ctx context.Context, query core.Query) (results []cor
 	if len(deduped) == 0 {
 		if pageErr := gogl.classifyPage(page, query.ProxyURL); pageErr != nil {
 			if errors.Is(pageErr, core.ErrEmptyResult) {
-				return nil, nil
+				return googleSearchPage{}, nil
 			}
-			return nil, pageErr
+			return googleSearchPage{}, pageErr
 		}
 		// Result candidates were found by Selectors.Results but none parsed
 		// into usable rows: treat as a genuine no-results SERP rather than a
 		// timeout, so callers don't retry pointlessly.
 		if len(searchResultElems) == 0 {
-			return nil, nil
+			return googleSearchPage{}, nil
 		}
-		return nil, core.ErrSearchTimeout
+		return googleSearchPage{}, core.ErrSearchTimeout
 	}
 	if query.Features {
 		deduped = core.AttachFeaturesToFirstResult(deduped, extractGoogleFeaturesFromPage(ctx, page))
@@ -492,7 +502,25 @@ func (gogl *Google) Search(ctx context.Context, query core.Query) (results []cor
 	}
 	resolutionQuery.Insecure = resolutionQuery.Insecure || gogl.Insecure
 	core.ResolveGoogleResultURLs(ctx, resolutionQuery, url, deduped)
-	return deduped, nil
+	return googleSearchPage{results: deduped, nextStart: gogl.nextSearchStart(page, query.Start)}, nil
+}
+
+func (gogl *Google) nextSearchStart(page *rod.Page, currentStart int) int {
+	links, err := page.Elements(Selectors.NextPage)
+	if err != nil {
+		return 0
+	}
+	nextStart := 0
+	for _, link := range links {
+		href, err := link.Attribute("href")
+		if err != nil || href == nil {
+			continue
+		}
+		if start, ok := googleNextSearchStart(*href, currentStart); ok && (nextStart == 0 || start < nextStart) {
+			nextStart = start
+		}
+	}
+	return nextStart
 }
 
 // SearchImage executes a Google image search and returns normalized image

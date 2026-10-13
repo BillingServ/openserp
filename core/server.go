@@ -65,6 +65,8 @@ type Server struct {
 
 // ServerOptions configures HTTP server middleware and resilience behavior.
 type ServerOptions struct {
+	// Auth enables per-user bearer API keys and per-key request limits.
+	Auth AuthConfig
 	// CacheTTL controls response cache entry lifetime. Zero disables caching.
 	CacheTTL time.Duration
 	// CacheMaxSize is the maximum number of cached entries.
@@ -109,6 +111,7 @@ type BrowserResolver func(proxyURL string) (*Browser, error)
 // and resilient search policies.
 func DefaultServerOptions() ServerOptions {
 	return ServerOptions{
+		Auth:                   DefaultAuthConfig(),
 		CacheTTL:               5 * time.Minute,
 		CacheMaxSize:           1000,
 		EnableCORS:             true,
@@ -178,6 +181,15 @@ func NewServerWithOptions(host string, port int, opts ServerOptions, searchEngin
 		app.Use(CORSMiddleware(opts.CORS))
 	}
 	app.Use(RequestLoggerMiddleware())
+	if authMiddleware, err := APIKeyMiddleware(opts.Auth); err != nil {
+		logrus.WithError(err).Error("Invalid API key configuration")
+		// Direct library callers also fail closed on a bad enabled config.
+		app.Use(func(c *fiber.Ctx) error {
+			return fiber.NewError(fiber.StatusServiceUnavailable, "API key configuration invalid")
+		})
+	} else {
+		app.Use(authMiddleware)
+	}
 
 	app.Get("/openapi.yaml", serv.handleOpenAPISpec)
 	app.Get("/docs", serv.handleSwaggerUI)

@@ -24,6 +24,7 @@ var Selectors = struct {
 	DescAny        string
 	AnswerBox      string
 	AnswerItem     string
+	NextPage       string
 
 	// Image search.
 	ImageResults      string
@@ -72,6 +73,7 @@ var Selectors = struct {
 	DescAny:      "div",
 	AnswerBox:    "div[data-hveid][data-ulkwtsb] div[data-q]",
 	AnswerItem:   "a",
+	NextPage:     "a#pnnext, a[rel='next'], #botstuff a[href*='start='], #foot a[href*='start=']",
 
 	// ImageResults selects each image cell in the image SERP grid.
 	ImageResults: "div[data-hveid][data-ved][jsaction]",

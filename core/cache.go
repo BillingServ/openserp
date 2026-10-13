@@ -56,6 +56,9 @@ func BuildCacheKey(engine string, action string, q Query) string {
 		provider,
 	)
 	hash := sha256.Sum256([]byte(raw))
+	if q.cacheTenant != "" {
+		hash = sha256.Sum256(append(hash[:], []byte("\x00"+q.cacheTenant)...))
+	}
 	return hex.EncodeToString(hash[:])
 }
 

@@ -30,7 +30,7 @@ type CORSConfig struct {
 const browserProfileIDHeader = "X-Browser-Profile-Id"
 const useProfileHeader = "X-Use-Profile"
 
-const exposedResponseHeaders = "X-Request-ID, X-Cache, X-Fallback-Engine, X-Proxy-Mode, X-Proxy-Tag, X-Proxy-Used, X-Proxy-Attempts, X-Network-Bytes, " + browserProfileIDHeader
+const exposedResponseHeaders = "X-Request-ID, X-Cache, X-Fallback-Engine, X-Proxy-Mode, X-Proxy-Tag, X-Proxy-Used, X-Proxy-Attempts, X-Network-Bytes, Retry-After, " + browserProfileIDHeader
 
 func DefaultCORSConfig() CORSConfig {
 	return CORSConfig{

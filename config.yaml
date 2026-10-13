@@ -6,6 +6,18 @@ server:
   raw_requests: false # true = raw HTTP mode, false = browser mode
   insecure: true # Allow insecure TLS connections
 
+auth:
+  enabled: false # Enable bearer API keys for hosted HTTP access
+  rate_requests: 60 # Requests per minute per key; 0 disables the default limit
+  rate_burst: 3
+  keys: [] # Add generated key hashes; see `openserp keygen customer-a`
+  # keys:
+  #   - id: customer-a
+  #     tenant: customer-a # Optional; defaults to id
+  #     key_hash: "sha256:<hash from keygen>"
+  #     rate_requests: 30 # Optional per-key override
+  #     rate_burst: 2
+
 app:
   log_format: "text" # json|text
   log_level: "" # error|warn|info|debug|trace; empty = warn for CLI, info for serve

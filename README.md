@@ -10,7 +10,7 @@
 
 **OpenSERP** is a free, open-source SERP API and CLI for Google, Yandex, Baidu, Bing, DuckDuckGo, and Ecosia.
 
-No API keys, no per-search billing: one command gives you live, structured search results on localhost - including engines the paid APIs don't cover. Use it as a search tool for LLMs and agents, or as a backend for SEO rank tracking. If you'd rather not run infrastructure, there is a [hosted version](https://openserp.org/cloud) with the same API.
+No external search API keys, no per-search billing: one command gives you live, structured search results on localhost - including engines the paid APIs don't cover. Use it as a search tool for LLMs and agents, or as a backend for SEO rank tracking. If you'd rather not run infrastructure, there is a [hosted version](https://openserp.org/cloud) with the same API.
 
 ![OpenSERP CLI demo](./docs/demo.gif)
 
@@ -347,11 +347,13 @@ Common parameters:
 | `date`         | Date range                                                                                                                                                                                              | `20250101..20251231`                 |
 | `file`         | File extension                                                                                                                                                                                          | `pdf`, `doc`, `xls`                  |
 | `site`         | Site-specific search                                                                                                                                                                                    | `github.com`                         |
-| `limit`        | Number of organic results, max 100. When omitted or `<=10`, only the first SERP page is parsed.                                                                                                         | `25`, `50`                           |
+| `limit`        | Maximum organic results, up to 100. Google browser web searches paginate as needed to fill the requested limit.                                                                                         | `10`, `25`, `100`                    |
 | `start`        | Pagination offset                                                                                                                                                                                       | `0`, `10`, `20`                      |
 | `format`       | Output format                                                                                                                                                                                           | `json`, `markdown`, `text`, `ndjson` |
 | `extract`      | Fetch and embed target-page content for top web results. Bool or int depth: `0`/`false` off, `true`/`1` top result, `N` top N (1-5). `extract_mode`/`min_runes` imply `extract=true` unless `extract=0` | `1`, `3`, `true`                     |
 | `extract_mode` | Extraction strategy: raw HTTP first, raw only, or browser-rendered                                                                                                                                      | `auto`, `fast`, `rendered`           |
+
+Google browser web searches follow the next SERP pages until the requested number of unique organic results is collected or Google stops offering more pages. This also applies to the default limit of 10 when the first page contains fewer results. For example, use `openserp search google "webhost billing" --limit 100 --search-timeout 180` to collect up to 100 results. If a later page is challenged or cannot be parsed, results collected before that page are returned.
 
 Engine-specific parameters:
 
@@ -381,6 +383,62 @@ Once the server is running, the interactive docs are available locally:
 - OpenAPI YAML: `http://127.0.0.1:7000/openapi.yaml`
 
 To browse the spec without running the server, see [docs/openapi.yaml](./docs/openapi.yaml). For a higher-level overview of how OpenSERP works internally, see the [architecture docs](https://openserp.org/docs/architecture/).
+
+## Hosted API keys
+
+HTTP authentication is disabled by default for local use. To give each customer a
+key, generate one with:
+
+```bash
+./openserp keygen customer-a
+```
+
+The JSON output contains `api_key` to give to the customer and a `config` entry
+containing its SHA-256 hash. Store the hash in `config.yaml`:
+
+```yaml
+auth:
+  enabled: true
+  rate_requests: 60
+  rate_burst: 3
+  keys:
+    - id: customer-a
+      tenant: customer-a
+      key_hash: "<paste the generated config.key_hash value here>"
+    - id: customer-b
+      tenant: customer-b
+      key_hash: "<paste the second generated config.key_hash value here>"
+      rate_requests: 30
+      rate_burst: 2
+```
+
+Use the generated `key_hash` value exactly, including its `sha256:` prefix. Start
+the server with `./openserp serve --config config.yaml`. Customers send their key
+in `Authorization: Bearer`:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  "http://127.0.0.1:7000/google/search?text=webhost%20billing&features=false"
+```
+
+Expose the hosted endpoint over HTTPS. Missing or invalid keys return `401`;
+exceeding a key's limit returns `429` with `Retry-After`. Limits count HTTP API
+requests, including cache hits, and are maintained per server process. Engine
+limits still control shared upstream search capacity. Monthly quotas and billing
+are not included.
+
+The configured key determines the tenant; a customer's `X-Tenant` header cannot
+override it. Authenticated caches and sticky browser lanes are scoped by that
+tenant. Logs include the key ID and tenant, without logging the bearer key or its
+hash. Each entry defaults its tenant to its ID. Per-key rate fields default to the
+global auth limits; setting global `rate_requests: 0` disables the default limit.
+
+Add, rotate, or revoke keys by editing `auth.keys` and restarting the server.
+The same entries can be supplied as JSON through `OPENSERP_AUTH_KEYS`, together
+with `OPENSERP_AUTH_ENABLED=true`. Health checks (`/health`, `/ready`), Swagger
+(`/docs`), and the OpenAPI spec stay public. Search, parse, extraction, statistics,
+and debug endpoints require a key when authentication is enabled. CLI searches
+continue to work directly without HTTP authentication.
 
 ## Self-Hosted or Cloud
 

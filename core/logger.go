@@ -20,6 +20,7 @@ type loggerContextKey string
 const (
 	requestIDContextKey loggerContextKey = "request_id"
 	tenantContextKey    loggerContextKey = "tenant"
+	apiKeyIDContextKey  loggerContextKey = "api_key_id"
 	engineContextKey    loggerContextKey = "engine"
 	queryHashContextKey loggerContextKey = "query_hash"
 
@@ -91,6 +92,9 @@ func WithRequest(ctx context.Context) *logrus.Entry {
 	}
 	if tenant, ok := ctx.Value(tenantContextKey).(string); ok && strings.TrimSpace(tenant) != "" {
 		fields["tenant"] = strings.TrimSpace(tenant)
+	}
+	if keyID, ok := ctx.Value(apiKeyIDContextKey).(string); ok && keyID != "" {
+		fields["api_key_id"] = keyID
 	}
 	if engine, ok := ctx.Value(engineContextKey).(string); ok && strings.TrimSpace(engine) != "" {
 		fields["engine"] = strings.TrimSpace(engine)

@@ -13,7 +13,9 @@ info:
 servers:
   - url: http://127.0.0.1:7000
     description: Local default server
-security: []
+security:
+  - BearerAuth: []
+  - {}
 tags:
   - name: Search
     description: Dedicated per-engine search endpoints
@@ -59,6 +61,8 @@ paths:
         - $ref: "#/components/parameters/ProxySessionIDHeader"
         - $ref: "#/components/parameters/TenantHeader"
       responses:
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Search results envelope
           headers:
@@ -181,6 +185,8 @@ paths:
         - $ref: "#/components/parameters/ProxySessionIDHeader"
         - $ref: "#/components/parameters/TenantHeader"
       responses:
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Image search results envelope
           headers:
@@ -240,6 +246,10 @@ paths:
       parameters:
         - $ref: "#/components/parameters/FormatQuery"
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Parsed search results envelope
           content:
@@ -279,6 +289,10 @@ paths:
       parameters:
         - $ref: "#/components/parameters/FormatQuery"
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Parsed search results envelope
           content:
@@ -340,6 +354,8 @@ paths:
         - $ref: "#/components/parameters/ProxySessionIDHeader"
         - $ref: "#/components/parameters/TenantHeader"
       responses:
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Aggregated envelope with clusters
           headers:
@@ -413,6 +429,8 @@ paths:
         - $ref: "#/components/parameters/ProxySessionIDHeader"
         - $ref: "#/components/parameters/TenantHeader"
       responses:
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Aggregated image results envelope
           headers:
@@ -454,6 +472,10 @@ paths:
       operationId: listMegaEngines
       summary: List available engines and runtime state
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Engine list
           content:
@@ -476,6 +498,10 @@ paths:
         - $ref: "#/components/parameters/UseProxyHeader"
         - $ref: "#/components/parameters/ProxyURLHeader"
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Extracted URL content
           content:
@@ -542,6 +568,10 @@ paths:
                     Language hint sent as `Accept-Language` on the target fetch.
                     The `lang` query parameter works as a fallback.
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Extracted URL content
           content:
@@ -575,6 +605,10 @@ paths:
             schema:
               $ref: "#/components/schemas/BatchExtractRequest"
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Batch extraction results, one item per unique URL
           content:
@@ -588,6 +622,7 @@ paths:
 
   /health:
     get:
+      security: []
       tags: [Health]
       operationId: healthCheck
       summary: Service health status
@@ -606,6 +641,7 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
   /ready:
     get:
+      security: []
       tags: [Health]
       operationId: readinessCheck
       summary: Service readiness status
@@ -628,6 +664,10 @@ paths:
       operationId: getStats
       summary: Combined cache, proxy, and circuit-breaker stats
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Runtime statistics
           content:
@@ -640,6 +680,10 @@ paths:
       operationId: getCacheStats
       summary: Cache statistics only
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Cache status
           content:
@@ -652,6 +696,10 @@ paths:
       operationId: getProxyStats
       summary: Proxy pool and per-engine proxy policy statistics
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Proxy stats
           content:
@@ -664,6 +712,10 @@ paths:
       operationId: getCircuitBreakerStats
       summary: Circuit breaker state per engine
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequestsError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
         "200":
           description: Circuit breaker stats
           content:
@@ -672,6 +724,7 @@ paths:
                 $ref: "#/components/schemas/CircuitBreakerStatsResponse"
   /openapi.yaml:
     get:
+      security: []
       tags: [Docs]
       operationId: getOpenAPISpec
       summary: Get raw OpenAPI YAML
@@ -684,6 +737,7 @@ paths:
                 type: string
   /docs:
     get:
+      security: []
       tags: [Docs]
       operationId: getSwaggerUI
       summary: Swagger UI for interactive API docs
@@ -695,6 +749,14 @@ paths:
               schema:
                 type: string
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Per-user API key, required when auth.enabled is true. Local servers with
+        authentication disabled accept requests without a key. Missing or invalid
+        keys return 401; per-key request limits return 429 with Retry-After.
   parameters:
     EnginePath:
       name: engine
@@ -769,7 +831,7 @@ components:
       name: limit
       in: query
       required: false
-      description: Maximum organic results to return (1-100). Ads may be returned in addition. Omitted or small limits (<=10) parse only the first SERP page; larger limits may paginate when an engine supports it.
+      description: Maximum organic results to return (1-100). Ads may be returned in addition. Google browser web searches paginate as needed to fill the requested limit, including the default of 10. Other engines may parse only the first SERP page for omitted or small limits (<=10), and paginate for larger limits when supported.
       schema:
         type: integer
         minimum: 1
@@ -1014,6 +1076,9 @@ components:
       description: >
         Optional tenant scope used to namespace sticky lane state across multi-tenant
         deployments. When present, lanes are keyed by `tenant + engine + session_id`.
+        When API-key authentication is enabled, the configured key determines the
+        tenant and this header cannot override it. Authenticated caches are also
+        scoped by the configured tenant.
       schema:
         type: string
   headers:
@@ -1067,6 +1132,21 @@ components:
       schema:
         type: string
   responses:
+    UnauthorizedError:
+      description: Missing or invalid bearer API key when authentication is enabled
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Bearer realm="openserp"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: unauthorized
+            code: 401
+            message: valid bearer API key required
     BadRequestError:
       description: Invalid request parameters
       content:
@@ -1118,12 +1198,24 @@ components:
                   proxy_provider: webshare
                   proxy_session_id: sid-123
     TooManyRequestsError:
-      description: Captcha challenge or rate-limit response from the search engine
+      description: Per-key request limit, captcha challenge, or upstream search rate limit
+      headers:
+        Retry-After:
+          description: Seconds until retry when a per-key request limit is exceeded
+          schema:
+            type: integer
+            minimum: 1
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
           examples:
+            apiKeyLimit:
+              value:
+                error: rate_limited
+                code: 429
+                reason: API_KEY_RATE_LIMIT
+                message: "API_KEY_RATE_LIMIT: API key request limit exceeded"
             captcha:
               value:
                 error: captcha_detected
@@ -1768,6 +1860,7 @@ components:
             routes.
           enum:
             - bad_request
+            - unauthorized
             - not_found
             - rate_limited
             - service_unavailable

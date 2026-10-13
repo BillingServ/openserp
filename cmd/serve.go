@@ -156,6 +156,7 @@ func buildServerOptions(corsCfg core.CORSConfig, proxyCfg core.ProxyConfig, fing
 	engineTimeout := time.Duration(config.App.Timeout) * time.Second
 
 	return core.ServerOptions{
+		Auth:                   config.Auth,
 		CacheTTL:               time.Duration(config.Cache.TTLSeconds) * time.Second,
 		CacheMaxSize:           config.Cache.MaxSize,
 		EnableCORS:             config.CORS.Enabled,

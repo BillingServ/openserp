@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -24,6 +25,7 @@ const (
 )
 
 type Config struct {
+	Auth             core.AuthConfig      `mapstructure:"auth"`
 	Server           ServerConfig         `mapstructure:"server"`
 	App              AppConfig            `mapstructure:"app"`
 	Proxies          core.ProxiesConfig   `mapstructure:"proxies"`
@@ -200,6 +202,12 @@ func commandDefaultsToQuiet(cmd *cobra.Command) bool {
 
 func sanitizedConfigForLog(cfg Config) map[string]interface{} {
 	return map[string]interface{}{
+		"auth": map[string]interface{}{
+			"enabled":       cfg.Auth.Enabled,
+			"keys":          len(cfg.Auth.Keys),
+			"rate_requests": cfg.Auth.RateRequests,
+			"rate_burst":    cfg.Auth.RateBurst,
+		},
 		"server": cfg.Server,
 		"app": map[string]interface{}{
 			"timeout":         cfg.App.Timeout,
@@ -343,6 +351,14 @@ func initializeConfig(cmd *cobra.Command) error {
 	if err := validateEngineProxyTags(v); err != nil {
 		return err
 	}
+	// JSON permits auth.keys to be supplied through OPENSERP_AUTH_KEYS.
+	if rawKeys, ok := v.Get("auth.keys").(string); ok {
+		var keys []core.APIKeyConfig
+		if err := json.Unmarshal([]byte(rawKeys), &keys); err != nil {
+			return fmt.Errorf("auth.keys must be a JSON array of API key entries")
+		}
+		v.Set("auth.keys", keys)
+	}
 
 	err = v.Unmarshal(&config)
 	if err != nil {
@@ -356,6 +372,12 @@ func initializeConfig(cmd *cobra.Command) error {
 	config.Proxies, err = core.NormalizeProxiesConfig(config.Proxies)
 	if err != nil {
 		return fmt.Errorf("invalid proxies config: %w", err)
+	}
+	if cmd.Name() == serveCMD.Name() {
+		config.Auth, err = core.NormalizeAuthConfig(config.Auth)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -418,6 +440,11 @@ func validateRemovedConfigPaths(v *viper.Viper) error {
 }
 
 func setConfigDefaults(v *viper.Viper) {
+	authDefaults := core.DefaultAuthConfig()
+	v.SetDefault("auth.enabled", false)
+	v.SetDefault("auth.rate_requests", authDefaults.RateRequests)
+	v.SetDefault("auth.rate_burst", authDefaults.RateBurst)
+	v.SetDefault("auth.keys", []interface{}{})
 	v.SetDefault("server.host", "127.0.0.1")
 	v.SetDefault("server.port", 7070)
 	v.SetDefault("server.debug", false)

@@ -263,6 +263,9 @@ func resultSortPosition(result SearchResult) int {
 // Query holds request parameters used by HTTP handlers and search engines.
 // Example minimal query: Query{Text: "golang", Limit: 10}.
 type Query struct {
+	// cacheTenant scopes authenticated HTTP caches without accepting a caller's
+	// tenant header as authorization. It is not part of the public query API.
+	cacheTenant string
 	// Text is the search phrase, for example "golang fiber tutorial".
 	Text string
 	// LangCode is an engine language hint such as "EN", "DE", or "RU".
@@ -367,6 +370,10 @@ const defaultQueryLimit = 10
 // headers. It validates numeric/boolean inputs and returns an *APIError for
 // invalid client input (400) or a plain error for internal failures.
 func (searchQuery *Query) InitFromContext(reqCtx *fiber.Ctx) error {
+	searchQuery.cacheTenant = ""
+	if keyID, _ := reqCtx.UserContext().Value(apiKeyIDContextKey).(string); keyID != "" {
+		searchQuery.cacheTenant = TenantFromContext(reqCtx.UserContext())
+	}
 	searchQuery.Text = strings.TrimSpace(reqCtx.Query("text"))
 	searchQuery.LangCode = strings.TrimSpace(reqCtx.Query("lang"))
 	searchQuery.Region = strings.TrimSpace(reqCtx.Query("region"))
